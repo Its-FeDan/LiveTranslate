@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DiarizationCapture } from "@/lib/diarization-capture";
+import type { SourceLanguage } from "@/lib/source-languages";
 import { reconcileDiarizedWindow } from "@/lib/transcript";
 import type {
   DiarizationWindow,
@@ -28,6 +29,7 @@ type DiarizationResponse = {
 export function useDiarization(
   stream: MediaStream | null,
   enabled: boolean,
+  sourceLanguage: SourceLanguage = "ru",
   windowSeconds = 8,
 ) {
   const captureRef = useRef<DiarizationCapture | null>(null);
@@ -72,6 +74,7 @@ export function useDiarization(
       const form = new FormData();
       form.append("file", window.blob, `${window.id}.wav`);
       form.append("windowId", window.id);
+      form.append("sourceLanguage", sourceLanguage);
       form.append("windowStartMs", String(window.startMs));
       form.append("durationMs", String(window.durationMs));
       form.append(
@@ -124,7 +127,7 @@ export function useDiarization(
       pendingWindowRef.current = null;
       if (pending) void uploadWindow(pending);
     }
-  }, []);
+  }, [sourceLanguage]);
 
   useEffect(() => {
     captureRef.current?.stop();
