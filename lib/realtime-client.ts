@@ -39,6 +39,8 @@ export class RealtimeTranslationClient {
   private events: RTCDataChannel | null = null;
   private stream: MediaStream | null = null;
   private translatedAudio: HTMLAudioElement | null = null;
+  private remoteStream: MediaStream | null = null;
+  private silent = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = true;
@@ -66,9 +68,6 @@ export class RealtimeTranslationClient {
     }
 
     this.callbacks.onStatus("requesting_permission");
-    this.translatedAudio = new Audio();
-    this.translatedAudio.autoplay = true;
-    this.translatedAudio.volume = this.volume;
 
     let discardRequestedStream = false;
     const streamPromise = navigator.mediaDevices
@@ -121,11 +120,8 @@ export class RealtimeTranslationClient {
     this.stream = null;
     this.callbacks.onStream(null);
 
-    if (this.translatedAudio) {
-      this.translatedAudio.pause();
-      this.translatedAudio.srcObject = null;
-      this.translatedAudio = null;
-    }
+    this.remoteStream = null;
+    this.stopAudio();
 
     if (updateStatus) this.callbacks.onStatus("stopped");
   }
@@ -141,14 +137,46 @@ export class RealtimeTranslationClient {
     if (this.translatedAudio) this.translatedAudio.volume = this.volume;
   }
 
+  setSilent(silent: boolean) {
+    this.silent = silent;
+    if (silent) {
+      this.stopAudio();
+    } else if (this.remoteStream) {
+      void this.playAudio();
+    }
+  }
+
   async resumeAudio(): Promise<boolean> {
-    if (!this.translatedAudio) return false;
+    if (this.silent || !this.remoteStream) return false;
+    const audio = this.translatedAudio ?? new Audio();
+    this.translatedAudio = audio;
+    audio.volume = this.volume;
+    if (audio.srcObject !== this.remoteStream) audio.srcObject = this.remoteStream;
     try {
-      await this.translatedAudio.play();
-      this.callbacks.onError(null);
-      return true;
+      await audio.play();
+      return audio === this.translatedAudio;
     } catch {
       return false;
+    }
+  }
+
+  private stopAudio() {
+    if (!this.translatedAudio) return;
+    this.translatedAudio.pause();
+    this.translatedAudio.srcObject = null;
+    this.translatedAudio = null;
+  }
+
+  private async playAudio() {
+    const playback = this.resumeAudio();
+    const audio = this.translatedAudio;
+    const played = await playback;
+    if (!played && audio && audio === this.translatedAudio) {
+      this.callbacks.onError({
+        code: "audio_output_blocked",
+        message: "Tap the audio control to hear the translation.",
+        retryable: true,
+      });
     }
   }
 
@@ -206,6 +234,8 @@ export class RealtimeTranslationClient {
 
     this.events?.close();
     this.peer?.close();
+    this.remoteStream = null;
+    this.stopAudio();
 
     const peer = new RTCPeerConnection();
     this.peer = peer;
@@ -222,19 +252,13 @@ export class RealtimeTranslationClient {
 
     peer.addEventListener("track", ({ streams }) => {
       const [remoteStream] = streams;
-      if (!remoteStream || !this.translatedAudio) return;
-      this.translatedAudio.srcObject = remoteStream;
+      if (!remoteStream || this.stopped || peer !== this.peer) return;
+      this.remoteStream = remoteStream;
       if (this.metrics.firstOutputAudioAt === null) {
         this.metrics.firstOutputAudioAt = performance.now();
         this.callbacks.onMetrics({ ...this.metrics });
       }
-      void this.translatedAudio.play().catch(() => {
-        this.callbacks.onError({
-          code: "audio_output_blocked",
-          message: "Tap the audio control to hear the translation.",
-          retryable: true,
-        });
-      });
+      if (!this.silent) void this.playAudio();
     });
 
     peer.addEventListener("connectionstatechange", () => {
