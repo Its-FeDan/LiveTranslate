@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   } catch {
     return apiError(
       "invalid_request",
-      "Only Russian-to-English translation is enabled.",
+      "Only English translation output is enabled.",
       400,
       false,
     );
