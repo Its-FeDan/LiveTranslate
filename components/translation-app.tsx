@@ -21,6 +21,7 @@ import {
   UserRoundPlus,
   Volume1,
   Volume2,
+  VolumeX,
   Waves,
   Wifi,
   X,
@@ -137,6 +138,8 @@ export function TranslationApp() {
     return (
       <StartView
         sourceLanguage={sourceLanguage}
+        silent={translation.silent}
+        onSilentChange={translation.setSilent}
         onSourceLanguageChange={setSourceLanguage}
         speakerLabelsEnabled={speakerLabelsEnabled}
         onSpeakerLabelsChange={setSpeakerLabelsEnabled}
@@ -181,7 +184,7 @@ export function TranslationApp() {
             <SpeechBars active={translation.status === "listening"} />
           </div>
 
-          {captionsVisible ? (
+          {captionsVisible || translation.silent ? (
             <p
               className={`translated-caption ${translation.translatedTranscript ? "has-copy" : ""}`}
             >
@@ -197,7 +200,7 @@ export function TranslationApp() {
             </div>
           )}
 
-          {showSource && captionsVisible && (
+          {showSource && (captionsVisible || translation.silent) && (
             <div className="source-caption-wrap">
               <span>{sourceLanguage.toUpperCase()}</span>
               <p lang={sourceLanguage}>{translation.sourceTranscript || (sourceLanguage === "ru" ? "Исходная речь появится здесь" : "De oorspronkelijke tekst verschijnt hier")}</p>
@@ -232,6 +235,8 @@ export function TranslationApp() {
         muted={translation.muted}
         replying={replying}
         volume={translation.volume}
+        silent={translation.silent}
+        onSilentChange={translation.setSilent}
         captionsVisible={captionsVisible}
         showSource={showSource}
         speakerLabelsEnabled={speakerLabelsEnabled}
@@ -263,6 +268,8 @@ export function TranslationApp() {
 }
 
 function StartView({
+  silent,
+  onSilentChange,
   sourceLanguage,
   onSourceLanguageChange,
   speakerLabelsEnabled,
@@ -270,6 +277,8 @@ function StartView({
   onStart,
   lastError,
 }: {
+  silent: boolean;
+  onSilentChange: (silent: boolean) => void;
   sourceLanguage: SourceLanguage;
   onSourceLanguageChange: (value: SourceLanguage) => void;
   speakerLabelsEnabled: boolean;
@@ -337,6 +346,21 @@ function StartView({
         )}
 
         <label className="feature-toggle">
+          <span className="feature-icon"><VolumeX size={20} /></span>
+          <span className="feature-copy">
+            <strong>Silent mode</strong>
+            <span>Read captions without translated audio</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={silent}
+            disabled={starting}
+            onChange={(event) => onSilentChange(event.target.checked)}
+          />
+          <span className="switch" aria-hidden="true" />
+        </label>
+
+        <label className="feature-toggle">
           <span className="feature-icon"><Waves size={20} /></span>
           <span className="feature-copy">
             <strong>Speaker labels <small>Beta</small></strong>
@@ -367,10 +391,10 @@ function StartView({
           <ChevronRight size={22} />
         </button>
 
-        <div className="headphone-note">
+        {!silent && <div className="headphone-note">
           <Headphones size={18} />
           <span><strong>Best with one earbud.</strong> Reply naturally in English.</span>
-        </div>
+        </div>}
       </section>
 
       <footer className="start-footer">
@@ -471,6 +495,8 @@ function SpeakerTimeline({
 }
 
 function LiveControls({
+  silent,
+  onSilentChange,
   sourceName,
   muted,
   replying,
@@ -488,6 +514,8 @@ function LiveControls({
   onStop,
 }: {
   sourceName: string;
+  silent: boolean;
+  onSilentChange: (silent: boolean) => void;
   muted: boolean;
   replying: boolean;
   volume: number;
@@ -509,7 +537,12 @@ function LiveControls({
     <aside className="control-dock">
       {expanded && (
         <div className="control-sheet">
-          <div className="volume-row">
+          <button type="button" aria-pressed={silent} onClick={() => onSilentChange(!silent)}>
+            <VolumeX size={18} />
+            Silent mode
+            <Check className={silent ? "is-checked" : "is-unchecked"} size={17} />
+          </button>
+          {!silent && <div className="volume-row">
             <Volume1 size={18} />
             <input
               aria-label="Translation volume"
@@ -521,11 +554,11 @@ function LiveControls({
               onChange={(event) => onVolumeChange(Number(event.target.value))}
             />
             <Volume2 size={18} />
-          </div>
-          <button type="button" onClick={() => onCaptionsChange(!captionsVisible)}>
+          </div>}
+          <button type="button" disabled={silent} onClick={() => onCaptionsChange(!captionsVisible)}>
             <Captions size={18} />
             English captions
-            <Check className={captionsVisible ? "is-checked" : "is-unchecked"} size={17} />
+            <Check className={captionsVisible || silent ? "is-checked" : "is-unchecked"} size={17} />
           </button>
           <button type="button" onClick={() => onSourceChange(!showSource)}>
             <Languages size={18} />
@@ -569,7 +602,7 @@ function LiveControls({
           onClick={() => setExpanded((current) => !current)}
           aria-label="Audio and caption controls"
         >
-          <Volume2 size={21} />
+          {silent ? <VolumeX size={21} /> : <Volume2 size={21} />}
           <span>Controls</span>
         </button>
 
