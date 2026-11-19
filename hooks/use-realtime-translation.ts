@@ -27,6 +27,7 @@ export function useRealtimeTranslation() {
   const [translatedTranscript, setTranslatedTranscript] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [muted, setMutedState] = useState(false);
+  const [silent, setSilentState] = useState(false);
   const [volume, setVolumeState] = useState(1);
   const [metrics, setMetrics] = useState<TranslationMetrics>(INITIAL_METRICS);
 
@@ -80,9 +81,21 @@ export function useRealtimeTranslation() {
     clientRef.current?.setVolume(normalized);
   }, []);
 
-  const resumeAudio = useCallback(async () => {
-    return (await clientRef.current?.resumeAudio()) ?? false;
+  const clearAudioError = useCallback(() => {
+    setError((current) => current?.code === "audio_output_blocked" ? null : current);
   }, []);
+
+  const setSilent = useCallback((next: boolean) => {
+    setSilentState(next);
+    clientRef.current?.setSilent(next);
+    if (next) clearAudioError();
+  }, [clearAudioError]);
+
+  const resumeAudio = useCallback(async () => {
+    const played = (await clientRef.current?.resumeAudio()) ?? false;
+    if (played) clearAudioError();
+    return played;
+  }, [clearAudioError]);
 
   return {
     status,
@@ -92,6 +105,8 @@ export function useRealtimeTranslation() {
     stream,
     muted,
     volume,
+    silent,
+    setSilent,
     metrics,
     start,
     stop,
