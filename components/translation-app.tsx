@@ -35,6 +35,7 @@ import {
 
 import { useDiarization } from "@/hooks/use-diarization";
 import { useRealtimeTranslation } from "@/hooks/use-realtime-translation";
+import { SOURCE_LANGUAGES, SOURCE_LANGUAGE_NAMES, type SourceLanguage } from "@/lib/source-languages";
 import { speakerDisplayName } from "@/lib/transcript";
 import type { SpeakerSegment, TranslationStatus } from "@/lib/types";
 
@@ -51,6 +52,8 @@ const STATUS_COPY: Record<TranslationStatus, string> = {
 
 export function TranslationApp() {
   const translation = useRealtimeTranslation();
+  const [sourceLanguage, setSourceLanguage] = useState<SourceLanguage>("ru");
+  const sourceName = SOURCE_LANGUAGE_NAMES[sourceLanguage];
   const [speakerLabelsEnabled, setSpeakerLabelsEnabled] = useState(false);
   const [showSource, setShowSource] = useState(true);
   const [captionsVisible, setCaptionsVisible] = useState(true);
@@ -62,6 +65,7 @@ export function TranslationApp() {
   const diarization = useDiarization(
     translation.stream,
     speakerLabelsEnabled && translation.isActive,
+    sourceLanguage,
   );
 
   useEffect(() => {
@@ -132,6 +136,8 @@ export function TranslationApp() {
   if (!translation.isActive) {
     return (
       <StartView
+        sourceLanguage={sourceLanguage}
+        onSourceLanguageChange={setSourceLanguage}
         speakerLabelsEnabled={speakerLabelsEnabled}
         onSpeakerLabelsChange={setSpeakerLabelsEnabled}
         onStart={handleStart}
@@ -163,8 +169,8 @@ export function TranslationApp() {
           </div>
         )}
 
-        <div className="language-route compact-route" aria-label="Russian to English">
-          <span><i className="flag-dot ru-dot" /> Russian</span>
+        <div className="language-route compact-route" aria-label={`${sourceName} to English`}>
+          <span><i className={`flag-dot ${sourceLanguage}-dot`} /> {sourceName}</span>
           <ChevronRight size={15} aria-hidden="true" />
           <span><i className="flag-dot en-dot" /> English</span>
         </div>
@@ -181,7 +187,7 @@ export function TranslationApp() {
             >
               {translation.translatedTranscript ||
                 (translation.status === "listening"
-                  ? "Listening for Russian…"
+                  ? `Listening for ${sourceName}…`
                   : "Preparing the interpreter…")}
             </p>
           ) : (
@@ -193,8 +199,8 @@ export function TranslationApp() {
 
           {showSource && captionsVisible && (
             <div className="source-caption-wrap">
-              <span>RU</span>
-              <p>{translation.sourceTranscript || "Исходная речь появится здесь"}</p>
+              <span>{sourceLanguage.toUpperCase()}</span>
+              <p lang={sourceLanguage}>{translation.sourceTranscript || (sourceLanguage === "ru" ? "Исходная речь появится здесь" : "De oorspronkelijke tekst verschijnt hier")}</p>
             </div>
           )}
         </section>
@@ -222,6 +228,7 @@ export function TranslationApp() {
       </section>
 
       <LiveControls
+        sourceName={sourceName}
         muted={translation.muted}
         replying={replying}
         volume={translation.volume}
@@ -256,11 +263,15 @@ export function TranslationApp() {
 }
 
 function StartView({
+  sourceLanguage,
+  onSourceLanguageChange,
   speakerLabelsEnabled,
   onSpeakerLabelsChange,
   onStart,
   lastError,
 }: {
+  sourceLanguage: SourceLanguage;
+  onSourceLanguageChange: (value: SourceLanguage) => void;
   speakerLabelsEnabled: boolean;
   onSpeakerLabelsChange: (enabled: boolean) => void;
   onStart: () => Promise<void>;
@@ -286,13 +297,26 @@ function StartView({
 
       <section className="start-hero">
         <div className="eyebrow"><Sparkles size={14} /> One-way live interpretation</div>
-        <h1>Russian,<br /><em>understood.</em></h1>
+        <h1>{SOURCE_LANGUAGE_NAMES[sourceLanguage]},<br /><em>understood.</em></h1>
         <p className="hero-copy">
-          Hear nearby Russian as natural English while different speakers still sound distinct.
+          Hear nearby {SOURCE_LANGUAGE_NAMES[sourceLanguage]} as natural English while different speakers still sound distinct.
         </p>
 
-        <div className="language-route" aria-label="Russian to English">
-          <span><i className="flag-dot ru-dot" /> Русский</span>
+        <div className="language-route">
+          <select
+            className="source-language-select"
+            aria-label="Source language"
+            value={sourceLanguage}
+            disabled={starting}
+            onChange={(event) => {
+              const language = SOURCE_LANGUAGES.find((code) => code === event.target.value);
+              if (language) onSourceLanguageChange(language);
+            }}
+          >
+            {SOURCE_LANGUAGES.map((code) => (
+              <option key={code} value={code}>{SOURCE_LANGUAGE_NAMES[code]}</option>
+            ))}
+          </select>
           <div className="route-line"><AudioLines size={18} /></div>
           <span><i className="flag-dot en-dot" /> English</span>
         </div>
@@ -447,6 +471,7 @@ function SpeakerTimeline({
 }
 
 function LiveControls({
+  sourceName,
   muted,
   replying,
   volume,
@@ -462,6 +487,7 @@ function LiveControls({
   onReplyEnd,
   onStop,
 }: {
+  sourceName: string;
   muted: boolean;
   replying: boolean;
   volume: number;
@@ -503,7 +529,7 @@ function LiveControls({
           </button>
           <button type="button" onClick={() => onSourceChange(!showSource)}>
             <Languages size={18} />
-            Russian source text
+            {sourceName} source text
             <Check className={showSource ? "is-checked" : "is-unchecked"} size={17} />
           </button>
           <button type="button" onClick={() => onSpeakerLabelsChange(!speakerLabelsEnabled)}>

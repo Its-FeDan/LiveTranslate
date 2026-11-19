@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { rateLimitHeaders, takeRateLimit } from "@/lib/rate-limit";
 import { isSameOrigin, requestIdentity } from "@/lib/security";
+import { SOURCE_LANGUAGES } from "@/lib/source-languages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +95,11 @@ export async function POST(request: Request) {
     return apiError("invalid_metadata", "The audio timing was invalid.", 400, false);
   }
 
+  const sourceLanguage = z.enum(SOURCE_LANGUAGES).safeParse(form.get("sourceLanguage") ?? "ru");
+  if (!sourceLanguage.success) {
+    return apiError("invalid_language", "Select Russian or Dutch as the source language.", 400, false);
+  }
+
   const names = parseSpeakerNames(form.get("knownSpeakerNames"));
   if (!names.ok) {
     return apiError("invalid_speakers", names.message, 400, false);
@@ -104,7 +110,7 @@ export async function POST(request: Request) {
   upstreamForm.append("model", "gpt-4o-transcribe-diarize");
   upstreamForm.append("response_format", "diarized_json");
   upstreamForm.append("chunking_strategy", "auto");
-  upstreamForm.append("language", "ru");
+  upstreamForm.append("language", sourceLanguage.data);
 
   for (let index = 0; index < names.value.length; index += 1) {
     const reference = form.get(`reference_${index}`);
