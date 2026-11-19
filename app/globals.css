@@ -208,6 +208,23 @@ input[type="range"] {
   background: linear-gradient(#f3f3f3 0 33%, #3e62ce 33% 66%, #d94e4e 66%);
 }
 
+.nl-dot {
+  background: linear-gradient(#ae1c28 0 33%, #f3f3f3 33% 66%, #21468b 66%);
+}
+
+.source-language-select {
+  justify-self: start;
+  max-width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .en-dot {
   background: var(--lime);
   box-shadow: 0 0 0 3px rgba(201, 255, 70, 0.12);
